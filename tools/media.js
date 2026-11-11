@@ -40,7 +40,7 @@ export function mediaTools(deps) {
             target.client.mediaState(),
             target.client.mountedImage().catch(() => null),
           ]);
-          return { device: target.name, media, state, mounted };
+          return { device: target.name, legacy: target.client.legacyMedia === true, media, state, mounted };
         } catch (error) {
           throw annotateDeviceError(error, target.name);
         }
@@ -51,7 +51,9 @@ export function mediaTools(deps) {
       description:
         'Mount one image (or one partition of it) as the target\'s USB drive. `rel` is the path shown by ' +
         'nanokvm_media. `cdrom` presents it as a CD-ROM instead of a hard disk, which is what operating-system ' +
-        'installers usually expect. The target sees the change only after a boot, a rescan or a replug.',
+        'installers usually expect. Application 2.5.3+ mounts whole images and partitions; 2.5.0 falls back to ' +
+        'its legacy image API, which mounts whole ISO/disk images only. The target sees the change only after a ' +
+        'boot, a rescan or a replug.',
       parameters: {
         device: DEVICE_PARAM,
         rel: { type: 'string', required: true, description: 'The image path from nanokvm_media.' },
@@ -82,7 +84,9 @@ export function mediaTools(deps) {
       name: 'nanokvm_eject',
       description:
         'Release the mounted medium from the target\'s USB drive. `force` is for a medium the box still reports as ' +
-        'open (an OS may still be reading it) — ejecting under a live installer can upset the guest, so it is opt-in.',
+        'open (an OS may still be reading it) — ejecting under a live installer can upset the guest, so it is opt-in. ' +
+        'Application 2.5.0 has no eject route: there the only way to replace a medium is to mount the next one, and ' +
+        'this tool says so instead of failing silently.',
       parameters: {
         device: DEVICE_PARAM,
         force: { type: 'boolean', description: 'Eject even when the box reports it is in use (default false).' },

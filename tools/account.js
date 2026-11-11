@@ -23,8 +23,11 @@ export function accountTools(deps) {
       name: 'nanokvm_account',
       description:
         "Read the account the box is serving, or change its web password. `info` returns the username, role and " +
-        'permissions. `password` needs both the current and the new password; the box checks the current one, ' +
-        'stores the new one and drops every session, so this plugin logs in again on the next call.',
+        'permissions. `password` needs both the current and the new password. Application 2.6+ verifies the ' +
+        'current one and revokes every session; 2.5.x does not verify it, but this tool still asks for it and ' +
+        'sends the old shape that version expects. The password values that are sent travel AES-wrapped ' +
+        '(2.6+ sends both, 2.5.x only the new one), and this plugin forgets its own session, so the next call ' +
+        'logs in again.',
       parameters: {
         device: DEVICE_PARAM,
         action: { type: 'string', enum: ['info', 'password'], description: 'What to do (default info).' },
