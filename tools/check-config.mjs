@@ -81,7 +81,9 @@ check('deviceSettings explains an empty configuration', () => {
   assert.throws(() => deviceSettings(resolveSettings({}), 'x'), /no NanoKVM device is configured/);
 });
 check('Config applies the documented defaults', () => {
-  const value = Config({});
+  // A published schemastery keeps `.volatile()` fields as refs, so read them
+  // through the same unwrapping the plugin uses at runtime.
+  const value = snapshot(Config({}));
   assert.deepEqual(value.devices, []);
   assert.equal(value.requestTimeoutMs, 15000);
   assert.equal(value.injectInput, true);

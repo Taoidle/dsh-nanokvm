@@ -1,15 +1,18 @@
 # Publish to npm when a version tag is pushed.
 #
-#   1. bump "version" in package.json, add a CHANGELOG entry, commit
+#   1. bump "version" in package.json and add a CHANGELOG entry
 #   2. git tag v0.2.1 && git push origin v0.2.1
 #
-# Requires a repository secret NPM_TOKEN (an npm automation token).
+# Requires the repository secret NPM_TOKEN (an npm automation token). Without
+# it the run is skipped with a warning instead of failing: the tag itself is
+# still a valid release marker.
 name: publish
 
 on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
 
 jobs:
   npm:
@@ -23,10 +26,23 @@ jobs:
         with:
           node-version: 22
           registry-url: https://registry.npmjs.org
+      - id: gate
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -n "$NODE_AUTH_TOKEN" ]; then
+            echo "ok=1" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=0" >> "$GITHUB_OUTPUT"
+            echo "::warning::NPM_TOKEN is not set — nothing was published"
+          fi
       # Only the schema library is needed to run the suite; the other imports
       # are provided by the harness at runtime.
-      - run: npm install --no-save --no-audit --no-fund @deepseek-ai/schemastery@^3.18.4
-      - run: npm run check && npm test
-      - run: npm publish --provenance --access public
+      - if: steps.gate.outputs.ok == '1'
+        run: npm install --no-save --no-audit --no-fund @deepseek-ai/schemastery@^3.18.4
+      - if: steps.gate.outputs.ok == '1'
+        run: npm run check && npm test
+      - if: steps.gate.outputs.ok == '1'
+        run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
