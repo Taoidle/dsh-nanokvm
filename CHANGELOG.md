@@ -1,5 +1,51 @@
 # Changelog
 
+## [0.3.1] — 2026-11-11
+
+### Fixed
+
+- The new tool modules (`tools/hid.js`, `tools/settings.js`, `tools/account.js`) were
+  missing from the package `files` list, so 0.3.0 installed with
+  `ERR_MODULE_NOT_FOUND` on import. They ship now.
+- `tools/check-pack.mjs` walks every relative import from the two entry points and
+  compares it with `npm pack --dry-run --json`, so a module that exists in the
+  checkout but not in the tarball fails the test suite instead of the install.
+
+## [0.3.0] — 2026-11-11
+
+### Added
+
+- **Click and drag in the sidebar panel.** The frame now takes absolute pointer
+  reports: press, move while held, release, right-click and wheel. The same report
+  is a tool too (`nanokvm_mouse` with `buttons`), so an agent can drag exactly what
+  a person could drag. Both paths obey one gate: with `injectInput: false` the panel
+  and the tools both refuse, instead of only the tools pretending to.
+- `nanokvm_hid`: keyboard LEDs, HID channel reset, USB mode (`normal` / `hid-only`),
+  the box's shortcut list (list/add/remove) and its leader key.
+- `nanokvm_settings`: hostname, mDNS, SSH, swap, memory limit, mouse jiggler and the
+  virtual USB devices (`network` / `media` / `disk`) — read with `action: "get"` and
+  written when a value is given.
+- `nanokvm_account`: the account the box serves (`info`), and the web password change
+  (`password`), which also drops every session on the box.
+- `nanokvm_system` gained `update` (the box downloads and installs its own update and
+  restarts its services), `preview` and `preview-set`.
+
+### Fixed
+
+- `nanokvm_resolution` works on firmware 1.4.x, which has no input-resolution route:
+  the size now falls back to the last frame (or a fresh one), and the same helper
+  backs pointer mapping, so a click no longer needs a screenshot taken first.
+- The `injectInput` setting was advertised but never enforced; it now refuses both
+  the tools and the panel with the same message.
+
+### Notes
+
+- A drag is three calls: `buttons: 1` down, moves with `buttons: 1`, `buttons: 0` up.
+  The panel throttles moves to about 11 per second; the tools send exactly what they
+  are told.
+- `tools/check-config.mjs` now compiles the new tools through `defineTool`, so a raw
+  parameter map can never reach the model API again.
+
 ## [0.2.0] — 2026-11-11
 
 ### Fixed

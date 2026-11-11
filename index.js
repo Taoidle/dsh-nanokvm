@@ -17,6 +17,9 @@ import { PanelView, registerPanelRoutes } from './lib/routes.js';
 import { deviceTools } from './tools/device.js';
 import { screenTools } from './tools/screen.js';
 import { controlTools } from './tools/control.js';
+import { hidTools } from './tools/hid.js';
+import { settingsTools } from './tools/settings.js';
+import { accountTools } from './tools/account.js';
 import { mediaTools } from './tools/media.js';
 import { systemTools } from './tools/system.js';
 
@@ -45,7 +48,16 @@ export function apply(ctx, config) {
   // JSON Schema the model API validates. Registering the raw options would send the
   // map itself as `parameters`, and a parameter named `type` then reads as the
   // schema keyword — the provider rejects the whole tool and every request fails.
-  for (const options of [...deviceTools(deps), ...screenTools(deps), ...controlTools(deps), ...mediaTools(deps), ...systemTools(deps)]) {
+  for (const options of [
+    ...deviceTools(deps),
+    ...screenTools(deps),
+    ...controlTools(deps),
+    ...hidTools(deps),
+    ...settingsTools(deps),
+    ...accountTools(deps),
+    ...mediaTools(deps),
+    ...systemTools(deps),
+  ]) {
     ctx.tools.register(defineTool(options));
   }
 

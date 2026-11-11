@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import crypto from 'node:crypto';
-import { NanoKvmDevice, NanoKvmError, absoluteMouseReport, hidKey, keyboardReport, modifierByte } from '../lib/device.js';
+import { NanoKvmDevice, NanoKvmError, absoluteMouseReport, assertInputAllowed, hidKey, keyboardReport, modifierByte } from '../lib/device.js';
 import { encryptPassword } from '../lib/http.js';
 import { jpegSize, takeJpeg } from '../lib/jpeg.js';
 
@@ -182,6 +182,32 @@ await check('a JPEG frame is found and measured', () => {
   assert.notEqual(found, null);
   assert.deepEqual(jpegSize(found.jpeg), { width: 800, height: 600 });
   assert.equal(takeJpeg(Buffer.from([0xff, 0xd8, 0x01])), null);
+});
+
+await check('input injection can be switched off for every caller', () => {
+  assert.throws(() => assertInputAllowed(() => ({ injectInput: false })), /input injection is disabled/);
+  assert.doesNotThrow(() => assertInputAllowed(() => ({ injectInput: true })));
+  assert.doesNotThrow(() => assertInputAllowed(() => ({})));
+  assert.doesNotThrow(() => assertInputAllowed(null));
+});
+
+await check('the pointer size falls back to the last frame', async () => {
+  const device = new NanoKvmDevice({ device: { baseUrl: 'http://127.0.0.1:1', username: 'admin', password: 'x' } });
+  device.screen = { width: 1280, height: 800 };
+  const size = await device.screenSize();
+  assert.deepEqual(size, { width: 1280, height: 800 });
+  const explicit = await device.screenSize({ width: 640, height: 400 });
+  assert.deepEqual(explicit, { width: 640, height: 400 });
+});
+
+await check('a single pointer report maps pixels to the 0-32767 range', async () => {
+  const device = new NanoKvmDevice({ device: { baseUrl: 'http://127.0.0.1:1', username: 'admin', password: 'x' } });
+  device.screen = { width: 1280, height: 800 };
+  const sent = [];
+  device.socket = { alive: true, sendBinary: (buffer) => sent.push(Buffer.from(buffer)), close() {} };
+  const report = await device.pointer({ x: 640, y: 400, buttons: 1 });
+  assert.equal(report.width, 1280);
+  assert.deepEqual([...sent[0]], [2, ...absoluteMouseReport({ x: 16384, y: 16384, buttons: 1, wheel: 0 })]);
 });
 
 client.close();

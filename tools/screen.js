@@ -84,20 +84,16 @@ export function screenTools(deps) {
     {
       name: 'nanokvm_resolution',
       description:
-        'Read the screen size the box reports for pointer input (input-resolution). Use it when a mouse click ' +
-        'should land on a pixel of the target screen; nanokvm_screenshot also reports the size it saw.',
+        'Read the screen size used for pointer coordinates. Firmware 1.4.x has no input-resolution route, so this ' +
+        'falls back to a frame grabbed from the stream; pass the result to nanokvm_mouse when a click must land on ' +
+        'an exact pixel.',
       parameters: { device: DEVICE_PARAM },
       output: PLAIN_OUTPUT,
       timeoutMs: 30000,
       async execute(args) {
         const target = deps.pool.target(args.device);
-        const resolution = await target.client.resolution();
-        if (resolution === null) {
-          throw new NanoKvmError(
-            `${target.name}: the box did not report an input resolution — take a screenshot first, or pass width/height to nanokvm_mouse`,
-          );
-        }
-        return { device: target.name, ...resolution };
+        const size = await target.client.screenSize();
+        return { device: target.name, ...size };
       },
     },
   ];

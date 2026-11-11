@@ -76,12 +76,19 @@ export function systemTools(deps) {
       name: 'nanokvm_system',
       description:
         "The NanoKVM box's own actions: `version` reports the installed application and the latest available one, " +
-        '`reboot` restarts the box itself (the target machine is not touched, but every console session drops), and ' +
-        '`wol` sends a Wake-on-LAN packet from the box\'s network to wake a machine by MAC.',
+        '`update` asks the box to download and install the newest application and restart its services (the target ' +
+        'machine is not touched, but every console session drops for a minute), `preview` reads whether preview ' +
+        'builds are offered and `preview-set` switches that, `reboot` restarts the box itself, and `wol` sends a ' +
+        'Wake-on-LAN packet from the box\'s network to wake a machine by MAC.',
       parameters: {
         device: DEVICE_PARAM,
-        action: { type: 'string', enum: ['version', 'reboot', 'wol'], description: 'What to do (default version).' },
+        action: {
+          type: 'string',
+          enum: ['version', 'update', 'preview', 'preview-set', 'reboot', 'wol'],
+          description: 'What to do (default version).',
+        },
         mac: { type: 'string', description: 'MAC address for action wol, e.g. aa:bb:cc:dd:ee:ff.' },
+        enabled: { type: 'boolean', description: 'For preview-set: whether the box should offer preview builds.' },
       },
       output: PLAIN_OUTPUT,
       timeoutMs: 120000,
@@ -92,6 +99,12 @@ export function systemTools(deps) {
           if (action === 'version') {
             const [version, info] = await Promise.all([target.client.version(), target.client.info().catch(() => null)]);
             return { device: target.name, version, info };
+          }
+          if (action === 'update') return { device: target.name, ok: true, note: 'the box restarts its services about a second after answering', result: await target.client.update() };
+          if (action === 'preview') return { device: target.name, preview: await target.client.preview() };
+          if (action === 'preview-set') {
+            if (args.enabled === undefined) throw new Error('action preview-set needs enabled');
+            return { device: target.name, ok: true, result: await target.client.setPreview(Boolean(args.enabled)) };
           }
           if (action === 'reboot') return { device: target.name, ok: true, result: await target.client.call('POST', '/api/vm/system/reboot') };
           const mac = String(args.mac ?? '').trim();

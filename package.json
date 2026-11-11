@@ -1,6 +1,6 @@
 {
   "name": "dsh-nanokvm",
-  "version": "0.2.0",
+  "version": "0.3.1",
   "description": "NanoKVM control for DeepSeek Harness: see the target screen, press power, type and click, mount virtual media, and manage several NanoKVM devices from one right-side panel.",
   "type": "module",
   "license": "MIT",
@@ -26,17 +26,20 @@
     "index.js",
     "client.js",
     "lib",
-    "tools/device.js",
-    "tools/screen.js",
-    "tools/control.js",
-    "tools/media.js",
-    "tools/system.js",
     "locale",
     "icon.svg",
     "cordis.patch.yml",
     "README.md",
     "CHANGELOG.md",
-    "LICENSE"
+    "LICENSE",
+    "tools/device.js",
+    "tools/screen.js",
+    "tools/control.js",
+    "tools/hid.js",
+    "tools/settings.js",
+    "tools/account.js",
+    "tools/media.js",
+    "tools/system.js"
   ],
   "icon": "./icon.svg",
   "dsh": {
@@ -68,8 +71,8 @@
     "@deepseek-ai/schemastery": "^3.18.4"
   },
   "scripts": {
-    "check": "node --check index.js && node --check client.js && node --check lib/config.js && node --check lib/http.js && node --check lib/ws.js && node --check lib/jpeg.js && node --check lib/device.js && node --check lib/pool.js && node --check lib/store.js && node --check lib/routes.js && node --check lib/output.js && node --check tools/device.js && node --check tools/screen.js && node --check tools/control.js && node --check tools/media.js && node --check tools/system.js && node --check tools/check-config.mjs && node --check tools/check-device.mjs && node --check tools/check-client.mjs && node --check tools/check-store.mjs",
-    "test": "node tools/check-config.mjs && node tools/check-device.mjs && node tools/check-client.mjs && node tools/check-store.mjs",
+    "check": "node --check index.js && node --check client.js && node --check lib/config.js && node --check lib/http.js && node --check lib/ws.js && node --check lib/jpeg.js && node --check lib/device.js && node --check lib/pool.js && node --check lib/store.js && node --check lib/routes.js && node --check lib/output.js && node --check tools/device.js && node --check tools/screen.js && node --check tools/control.js && node --check tools/media.js && node --check tools/system.js && node --check tools/hid.js && node --check tools/settings.js && node --check tools/account.js && node --check tools/check-config.mjs && node --check tools/check-device.mjs && node --check tools/check-client.mjs && node --check tools/check-store.mjs && node --check tools/check-pack.mjs",
+    "test": "node tools/check-config.mjs && node tools/check-device.mjs && node tools/check-client.mjs && node tools/check-store.mjs && node tools/check-pack.mjs",
     "prepublishOnly": "npm run check && npm test",
     "pack:check": "npm pack --dry-run"
   },

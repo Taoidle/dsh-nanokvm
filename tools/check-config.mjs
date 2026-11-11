@@ -138,6 +138,9 @@ const factories = {
   '../tools/device.js': 'deviceTools',
   '../tools/screen.js': 'screenTools',
   '../tools/control.js': 'controlTools',
+  '../tools/hid.js': 'hidTools',
+  '../tools/settings.js': 'settingsTools',
+  '../tools/account.js': 'accountTools',
   '../tools/media.js': 'mediaTools',
   '../tools/system.js': 'systemTools',
 };

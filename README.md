@@ -68,12 +68,15 @@ opens after an action, and the panel frame rate.
 | `nanokvm_reset` | press the hardware reset button |
 | `nanokvm_type` | type text through the box's paste path |
 | `nanokvm_key` | press a key or chord (works in a BIOS) |
-| `nanokvm_mouse` | move/click/scroll at a pixel of the target screen |
+| `nanokvm_mouse` | move/click/scroll at a pixel of the target screen; `buttons` holds a mask for drag steps |
+| `nanokvm_hid` | keyboard LEDs, HID reset, USB mode, the box's shortcuts and leader key |
+| `nanokvm_settings` | hostname, mDNS, SSH, swap, memory limit, mouse jiggler, virtual devices |
+| `nanokvm_account` | the box account, and changing its web password |
 | `nanokvm_media` | list images and the virtual drive state |
 | `nanokvm_mount` / `nanokvm_eject` | attach or release an image as the USB drive |
 | `nanokvm_hdmi` | read/reset/enable/disable capture, idle timeout |
 | `nanokvm_oled` | read or blank the box's OLED |
-| `nanokvm_system` | firmware version, reboot the box, Wake-on-LAN |
+| `nanokvm_system` | firmware version, update, preview builds, reboot the box, Wake-on-LAN |
 
 Every tool takes `device`; omitting it uses the default box.
 
@@ -82,6 +85,10 @@ Every tool takes `device`; omitting it uses the default box.
 The NanoKVM tab in the right sidebar shows the captured frame, the power LED state, and the actions worth one click:
 power on/off/press, reset, Enter, an HDMI reset, and a text field that types into the target. With several boxes a
 selector switches between them.
+
+The frame itself takes input: click, drag, right-click and wheel are absolute pointer reports mapped from the
+rendered picture back to the target's pixels. It is the same report `nanokvm_mouse` sends, and it obeys the same
+switch — with keyboard/mouse injection turned off, the panel refuses too instead of only the tools doing so.
 
 ## How it talks to a box
 

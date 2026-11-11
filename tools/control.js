@@ -9,7 +9,7 @@
  */
 import { defineTool } from '@deepseek-ai/dsh-tools';
 import { PLAIN_OUTPUT } from '../lib/output.js';
-import { NanoKvmError, annotateDeviceError } from '../lib/device.js';
+import { NanoKvmError, annotateDeviceError, assertInputAllowed } from '../lib/device.js';
 
 const DEVICE_PARAM = {
   type: 'string',
@@ -92,6 +92,7 @@ export function controlTools(deps) {
       output: PLAIN_OUTPUT,
       timeoutMs: 120000,
       async execute(args) {
+        assertInputAllowed(deps.settings);
         const target = deps.pool.target(args.device);
         const text = String(args.text ?? '');
         if (text === '') throw new NanoKvmError('nothing to type');
@@ -119,6 +120,7 @@ export function controlTools(deps) {
       output: PLAIN_OUTPUT,
       timeoutMs: 60000,
       async execute(args) {
+        assertInputAllowed(deps.settings);
         const target = deps.pool.target(args.device);
         const keys = Array.isArray(args.keys) && args.keys.length > 0 ? args.keys : args.modifiers ? [] : ['enter'];
         try {
@@ -134,7 +136,8 @@ export function controlTools(deps) {
       description:
         'Move the pointer over the target screen and optionally click or scroll. Coordinates are pixels on the ' +
         'target screen; the box reports the size it knows, and a screenshot also records it. Absolute reports span ' +
-        '0–32767, so the pixel is mapped with that size — pass width/height when no frame was taken yet.',
+        '0–32767, so the pixel is mapped with that size — pass width/height when no frame was taken yet. ' +
+        'A drag is three calls with `buttons`: 1 down, moves with 1, then 0 up (left 1, right 2, middle 4).',
       parameters: {
         device: DEVICE_PARAM,
         x: { type: 'number', required: true, description: 'X in target screen pixels.' },
@@ -144,12 +147,28 @@ export function controlTools(deps) {
         button: { type: 'string', enum: ['left', 'right', 'middle'], description: 'Click with this button (omit to only move).' },
         clicks: { type: 'number', description: 'How many clicks (default 1; 2 for a double click).' },
         wheel: { type: 'number', description: 'Wheel delta at the destination (negative scrolls down).' },
+        buttons: {
+          type: 'number',
+          description: 'Button mask to hold instead of clicking (left 1, right 2, middle 4) — for drag steps. 0 releases.',
+        },
       },
       output: PLAIN_OUTPUT,
       timeoutMs: 60000,
       async execute(args) {
+        assertInputAllowed(deps.settings);
         const target = deps.pool.target(args.device);
         try {
+          if (args.buttons !== undefined) {
+            const pointer = await target.client.pointer({
+              x: Number(args.x ?? 0),
+              y: Number(args.y ?? 0),
+              width: args.width === undefined ? undefined : Number(args.width),
+              height: args.height === undefined ? undefined : Number(args.height),
+              buttons: Number(args.buttons),
+              wheel: args.wheel === undefined ? 0 : Number(args.wheel),
+            });
+            return { device: target.name, ok: true, pointer };
+          }
           const result = await target.client.mouse({
             x: Number(args.x ?? 0),
             y: Number(args.y ?? 0),

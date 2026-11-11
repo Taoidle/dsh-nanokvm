@@ -107,6 +107,7 @@ function build(require, module) {
         'pane.enter': 'Enter',
         'pane.hdmiReset': 'Reset HDMI',
         'pane.noFrame': 'No frame — the target may be off, or its HDMI asleep.',
+        'pane.inputOff': 'Input injection is off: click and drag are disabled in the plugin settings.',
         'pane.powered': 'Powered',
         'pane.down': 'Off',
         'pane.unknown': 'Unknown',
@@ -182,6 +183,7 @@ function build(require, module) {
         'pane.enter': 'Enter',
         'pane.hdmiReset': 'Сбросить HDMI',
         'pane.noFrame': 'Кадра нет — машина выключена или её HDMI спит.',
+        'pane.inputOff': 'Ввод выключен: клики и перетаскивание запрещены в настройках плагина.',
         'pane.powered': 'Включено',
         'pane.down': 'Выключено',
         'pane.unknown': 'Неизвестно',
@@ -257,6 +259,7 @@ function build(require, module) {
         'pane.enter': '回车',
         'pane.hdmiReset': '重置 HDMI',
         'pane.noFrame': '没有画面——目标可能已关机，或 HDMI 已休眠。',
+        'pane.inputOff': '输入注入已关闭：设置里禁止了点击和拖拽。',
         'pane.powered': '已开机',
         'pane.down': '已关机',
         'pane.unknown': '未知',
@@ -370,13 +373,15 @@ function build(require, module) {
 .dsh-nk-edit-row { display: grid; grid-template-columns: minmax(160px, 220px) 1fr; gap: 8px 12px; align-items: center; }
 .dsh-nk-edit-label { font-size: 13px; opacity: 0.85; }
 .dsh-nk-error { font-size: 12px; color: #d05252; }
+.dsh-nk-warn { font-size: 12px; color: #b58b2a; }
 .dsh-nk-probe { font-size: 12px; color: #4f9d69; }
 .dsh-nk-flash { font-size: 12px; opacity: 0.75; }
 .dsh-nk-pane { display: flex; flex-direction: column; gap: 10px; padding: 10px; height: 100%; box-sizing: border-box; }
 .dsh-nk-pane-head { display: flex; align-items: center; gap: 8px; }
 .dsh-nk-select { font-size: 12px; padding: 4px 6px; border-radius: 6px; background: rgba(127,127,127,0.12); color: inherit; border: 1px solid rgba(127,127,127,0.3); }
 .dsh-nk-stage { position: relative; background: #000; border-radius: 8px; overflow: hidden; min-height: 120px; display: flex; align-items: center; justify-content: center; }
-.dsh-nk-stage img { display: block; width: 100%; height: auto; }
+.dsh-nk-stage img { display: block; width: 100%; height: auto; user-select: none; -webkit-user-drag: none; pointer-events: none; }
+.dsh-nk-stage[data-input="1"] { cursor: crosshair; touch-action: none; overscroll-behavior: contain; }
 .dsh-nk-stage-note { color: rgba(255,255,255,0.7); font-size: 12px; padding: 18px 12px; text-align: center; line-height: 1.5; }
 .dsh-nk-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 .dsh-nk-paste { display: flex; gap: 6px; }
@@ -778,6 +783,11 @@ function build(require, module) {
       const [busy, setBusy] = React.useState(false);
       const [tick, setTick] = React.useState(0);
       const frameUrl = React.useRef(null);
+      const stageRef = React.useRef(null);
+      const dragRef = React.useRef(null);
+      const lastPointRef = React.useRef(null);
+      const lastMoveRef = React.useRef(0);
+      const pointerApiRef = React.useRef(null);
 
       React.useEffect(() => form.subscribe(() => setSettings(form.getSnapshot()?.value ?? {})), [form]);
 
@@ -886,6 +896,112 @@ function build(require, module) {
         }
       };
 
+      // Click and drag are absolute pointer reports on the frame: the press sends
+      // the button mask, the moves keep it, the release sends 0. The server maps
+      // pixels with the frame size and refuses when input injection is off.
+      const inputOn = state?.injectInput !== false;
+
+      const pointOf = (event) => {
+        const node = stageRef.current;
+        const meta = frame?.meta;
+        if (node === null || !meta || !(meta.width > 0) || !(meta.height > 0)) return null;
+        const rect = node.getBoundingClientRect();
+        if (!(rect.width > 0) || !(rect.height > 0)) return null;
+        return {
+          x: Math.round(((event.clientX - rect.left) / rect.width) * meta.width),
+          y: Math.round(((event.clientY - rect.top) / rect.height) * meta.height),
+          width: meta.width,
+          height: meta.height,
+        };
+      };
+
+      const pushPointer = async (point, buttons, wheel = 0) => {
+        try {
+          await fetch(`${PANEL_BASE}/action?action=pointer`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json', accept: 'application/json' },
+            cache: 'no-store',
+            body: JSON.stringify({ device: deviceEff, ...point, buttons, wheel }),
+          });
+        } catch {
+          // A dropped move is harmless: the next report carries the position.
+        }
+      };
+
+      React.useEffect(() => {
+        pointerApiRef.current = { pointOf, pushPointer, inputOn };
+      });
+
+      React.useEffect(() => {
+        const node = stageRef.current;
+        if (node === null) return undefined;
+        const onWheel = (event) => {
+          const api = pointerApiRef.current;
+          if (api === null || !api.inputOn) return;
+          const point = api.pointOf(event);
+          if (point === null) return;
+          event.preventDefault();
+          void api.pushPointer(point, 0, event.deltaY > 0 ? -1 : 1);
+        };
+        node.addEventListener('wheel', onWheel, { passive: false });
+        return () => node.removeEventListener('wheel', onWheel);
+      }, [frame === null]);
+
+      const rightClick = async (point) => {
+        await pushPointer(point, 2);
+        await new Promise((resolve) => setTimeout(resolve, 40));
+        await pushPointer(point, 0);
+      };
+
+      const stageInput = inputOn
+        ? {
+            'data-input': '1',
+            onPointerDown: (event) => {
+              const point = pointOf(event);
+              if (point === null) return;
+              event.preventDefault();
+              const mask = event.button === 2 ? 2 : event.button === 1 ? 4 : 1;
+              dragRef.current = mask;
+              lastPointRef.current = point;
+              try {
+                event.currentTarget.setPointerCapture?.(event.pointerId);
+              } catch {
+                // Older engines without pointer capture: the release still lands.
+              }
+              void pushPointer(point, mask);
+            },
+            onPointerMove: (event) => {
+              if (dragRef.current === null) return;
+              const now = Date.now();
+              if (now - lastMoveRef.current < 90) return;
+              const point = pointOf(event);
+              if (point === null) return;
+              lastMoveRef.current = now;
+              lastPointRef.current = point;
+              void pushPointer(point, dragRef.current);
+            },
+            onPointerUp: (event) => {
+              const was = dragRef.current;
+              dragRef.current = null;
+              const point = pointOf(event) ?? lastPointRef.current;
+              if (was === null || point === null) return;
+              void pushPointer(point, 0);
+            },
+            onPointerCancel: () => {
+              const was = dragRef.current;
+              dragRef.current = null;
+              if (was === null || lastPointRef.current === null) return;
+              void pushPointer(lastPointRef.current, 0);
+            },
+            onContextMenu: (event) => {
+              event.preventDefault();
+              const point = pointOf(event);
+              if (point === null) return;
+              void rightClick(point);
+            },
+          }
+        : {};
+
       const gpio = state?.gpio ?? null;
       const powerKnown = typeof gpio?.pwr === 'boolean';
       const powered = powerKnown ? gpio.pwr : null;
@@ -917,6 +1033,8 @@ function build(require, module) {
           }),
           jsx('div', {
             className: 'dsh-nk-stage',
+            ref: stageRef,
+            ...stageInput,
             children:
               frame === null
                 ? jsx('div', { className: 'dsh-nk-stage-note', children: frameError ?? t('pane.noFrame') })
@@ -937,6 +1055,7 @@ function build(require, module) {
               }),
             ],
           }),
+          inputOn ? null : jsx('div', { className: 'dsh-nk-warn', children: t('pane.inputOff') }),
           jsxs('div', {
             className: 'dsh-nk-actions',
             children: [
