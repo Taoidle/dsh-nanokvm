@@ -1,0 +1,31 @@
+# Publish to npm when a version tag is pushed.
+#
+#   1. bump "version" in package.json, add a CHANGELOG entry, commit
+#   2. git tag v0.2.1 && git push origin v0.2.1
+#
+# Requires a repository secret NPM_TOKEN (an npm automation token).
+name: publish
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  npm:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # provenance
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+      - run: npm install --no-audit --no-fund
+        continue-on-error: true # peer deps are provided by the harness, not by npm
+      - run: npm run check && npm test
+      - run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

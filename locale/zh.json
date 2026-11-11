@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "NanoKVM 设备",
+    "description": "查看目标机画面、按电源键、输入与点击、挂载虚拟介质，并在右侧面板里同时管理多台 NanoKVM。"
+  }
+}

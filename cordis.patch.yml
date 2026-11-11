@@ -1,0 +1,11 @@
+# Bundle layer of dsh-nanokvm.
+#
+# One plugin entry. `id` must match the settings namespace: the `settings`
+# service addresses the plugin by the id of its profile entry and builds the form
+# from the exported `Config` schema. `name` is the package name.
+#
+# No config is set here on purpose: defaults come from the schema, and device
+# cards write their edits into the profile patch layer.
+- insert:
+    - id: nanokvm
+      name: dsh-nanokvm

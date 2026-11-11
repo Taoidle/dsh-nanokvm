@@ -1,0 +1,85 @@
+{
+  "name": "dsh-nanokvm",
+  "version": "0.2.0",
+  "description": "NanoKVM control for DeepSeek Harness: see the target screen, press power, type and click, mount virtual media, and manage several NanoKVM devices from one right-side panel.",
+  "type": "module",
+  "license": "MIT",
+  "keywords": [
+    "deepseek",
+    "deepseek-harness",
+    "dsh",
+    "dsh-plugin",
+    "cordis",
+    "nanokvm",
+    "kvm",
+    "ip-kvm",
+    "remote-control",
+    "computer-use"
+  ],
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "lib",
+    "tools/device.js",
+    "tools/screen.js",
+    "tools/control.js",
+    "tools/media.js",
+    "tools/system.js",
+    "locale",
+    "icon.svg",
+    "cordis.patch.yml",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "icon": "./icon.svg",
+  "dsh": {
+    "engines": {
+      "dsh": ">=0.2.0-rc.2"
+    },
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-settings",
+        "@deepseek-ai/dsh-client-ui-slots",
+        "@deepseek-ai/dsh-client-ui-sidebar-right",
+        "@deepseek-ai/dsh-client-locale"
+      ]
+    }
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/dsh": ">=0.2.0-rc.2",
+    "@deepseek-ai/dsh-tools": "^0.2.0-rc.1",
+    "@deepseek-ai/schemastery": "^3.18.4"
+  },
+  "scripts": {
+    "check": "node --check index.js && node --check client.js && node --check lib/config.js && node --check lib/http.js && node --check lib/ws.js && node --check lib/jpeg.js && node --check lib/device.js && node --check lib/pool.js && node --check lib/store.js && node --check lib/routes.js && node --check lib/output.js && node --check tools/device.js && node --check tools/screen.js && node --check tools/control.js && node --check tools/media.js && node --check tools/system.js && node --check tools/check-config.mjs && node --check tools/check-device.mjs && node --check tools/check-client.mjs && node --check tools/check-store.mjs",
+    "test": "node tools/check-config.mjs && node tools/check-device.mjs && node tools/check-client.mjs && node tools/check-store.mjs",
+    "prepublishOnly": "npm run check && npm test",
+    "pack:check": "npm pack --dry-run"
+  },
+  "author": "Taoidle",
+  "homepage": "https://github.com/Taoidle/dsh-nanokvm#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Taoidle/dsh-nanokvm.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Taoidle/dsh-nanokvm/issues"
+  }
+}
