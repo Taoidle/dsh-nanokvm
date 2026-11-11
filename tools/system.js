@@ -66,7 +66,7 @@ export function systemTools(deps) {
         const target = deps.pool.target(args.device);
         try {
           if (args.sleep === undefined) return { device: target.name, oled: await target.client.oled() };
-          return { device: target.name, ok: true, oled: await target.client.call('POST', '/api/vm/oled', { sleep: Boolean(args.sleep) }) };
+          return { device: target.name, ok: true, oled: await target.client.setOled(Boolean(args.sleep)) };
         } catch (error) {
           throw annotateDeviceError(error, target.name);
         }

@@ -7,7 +7,8 @@ import assert from 'node:assert/strict';
 import http from 'node:http';
 import crypto from 'node:crypto';
 import { NanoKvmDevice, NanoKvmError, absoluteMouseReport, assertInputAllowed, hidKey, keyboardReport, modifierByte } from '../lib/device.js';
-import { encryptPassword } from '../lib/http.js';
+import { encryptPassword, request } from '../lib/http.js';
+import { PanelView } from '../lib/routes.js';
 import { jpegSize, takeJpeg } from '../lib/jpeg.js';
 
 const problems = [];
@@ -42,7 +43,28 @@ let validToken = null;
 let loginCount = 0;
 let pwr = false;
 let expireAfterLogin = false;
-const seen = { logins: 0, info: 0, mediaState: 0, gpio: 0, failedAuth: 0 };
+const seen = {
+  logins: 0,
+  info: 0,
+  mediaState: 0,
+  gpio: 0,
+  failedAuth: 0,
+  inputResolution: 0,
+  oledBodies: [],
+  jigglerPaths: [],
+  jigglerBodies: [],
+  passwordBodies: [],
+  legacyMounts: [],
+  legacyEjects: 0,
+};
+let applicationVersion = '2.5.0';
+
+/** Read and parse one JSON request body. */
+function readJson(req, done) {
+  const chunks = [];
+  req.on('data', (chunk) => chunks.push(chunk));
+  req.on('end', () => done(JSON.parse(Buffer.concat(chunks).toString('utf8'))));
+}
 
 const server = http.createServer((req, res) => {
   const cookie = String(req.headers.cookie ?? '');
@@ -81,6 +103,76 @@ const server = http.createServer((req, res) => {
   if (req.url === '/api/vm/info') {
     seen.info += 1;
     reply(200, { code: 0, data: { ips: [{ name: 'eth0', addr: '192.168.2.57', version: 'IPv4', type: 'Wired' }], application: '2.5.0' } });
+    return;
+  }
+  if (req.url === '/api/application/version' && req.method === 'GET') {
+    reply(200, { code: 0, data: { current: applicationVersion, latest: applicationVersion } });
+    return;
+  }
+  if (req.url === '/api/vm/input-resolution' && req.method === 'GET') {
+    seen.inputResolution += 1;
+    reply(404, '404 page not found');
+    return;
+  }
+  if (req.url === '/api/vm/oled' && req.method === 'GET') {
+    reply(200, { code: 0, data: { exist: true, sleep: 0 } });
+    return;
+  }
+  if (req.url === '/api/vm/oled' && req.method === 'POST') {
+    readJson(req, (body) => {
+      seen.oledBodies.push(body);
+      reply(200, { code: 0, data: null });
+    });
+    return;
+  }
+  if (req.url === '/api/vm/mouse-jiggler/' && req.method === 'POST') {
+    readJson(req, (body) => {
+      seen.jigglerPaths.push(req.url);
+      seen.jigglerBodies.push(body);
+      reply(200, { code: 0, data: null });
+    });
+    return;
+  }
+  if (req.url === '/api/vm/mouse-jiggler' && req.method === 'POST') {
+    // What Gin answers when the trailing slash is missing; the client must
+    // follow it with POST and the same body rather than treating 307 as success.
+    seen.jigglerPaths.push(req.url);
+    reply(307, '', { location: '/api/vm/mouse-jiggler/' });
+    return;
+  }
+  if (req.url === '/api/auth/password' && req.method === 'POST') {
+    readJson(req, (body) => {
+      seen.passwordBodies.push(body);
+      reply(200, { code: 0, data: null });
+    });
+    return;
+  }
+  if (req.url === '/api/storage/media' && req.method === 'GET') {
+    reply(404, '404 page not found');
+    return;
+  }
+  if (req.url === '/api/storage/media/mount' && req.method === 'POST') {
+    reply(404, '404 page not found');
+    return;
+  }
+  if (req.url === '/api/storage/media/eject' && req.method === 'POST') {
+    reply(404, '404 page not found');
+    return;
+  }
+  if (req.url === '/api/storage/image' && req.method === 'GET') {
+    reply(200, { code: 0, data: { files: ['/data/test.iso'] } });
+    return;
+  }
+  if (req.url === '/api/storage/image/mount' && req.method === 'POST') {
+    readJson(req, (body) => {
+      seen.legacyMounts.push(body);
+      reply(200, { code: 0, data: null });
+    });
+    return;
+  }
+  if (req.url === '/api/storage/image/eject' && req.method === 'POST') {
+    seen.legacyEjects += 1;
+    reply(404, '404 page not found');
     return;
   }
   if (req.url === '/api/vm/gpio' && req.method === 'GET') {
@@ -208,6 +300,143 @@ await check('a single pointer report maps pixels to the 0-32767 range', async ()
   const report = await device.pointer({ x: 640, y: 400, buttons: 1 });
   assert.equal(report.width, 1280);
   assert.deepEqual([...sent[0]], [2, ...absoluteMouseReport({ x: 16384, y: 16384, buttons: 1, wheel: 0 })]);
+});
+
+await check('OLED writes send the integer Sleep field', async () => {
+  seen.oledBodies.length = 0;
+  await client.setOled(true);
+  await client.setOled(false);
+  assert.deepEqual(seen.oledBodies, [{ sleep: 1 }, { sleep: 0 }]);
+  assert.equal(typeof seen.oledBodies[0].sleep, 'number');
+});
+
+await check('the mouse-jiggler write uses the registered trailing-slash route', async () => {
+  seen.jigglerPaths.length = 0;
+  await client.setMouseJiggler({ enabled: true, mode: 'relative' });
+  assert.deepEqual(seen.jigglerPaths, ['/api/vm/mouse-jiggler/']);
+  assert.deepEqual(seen.jigglerBodies.at(-1), { enabled: true, mode: 'relative' });
+});
+
+await check('a 307 is followed with POST and the same body', async () => {
+  await client.login();
+  seen.jigglerPaths.length = 0;
+  const reply = await request(
+    { baseUrl: device.baseUrl },
+    {
+      method: 'POST',
+      path: '/api/vm/mouse-jiggler',
+      body: { enabled: false, mode: 'absolute' },
+      headers: { cookie: `nano-kvm-token=${client.token}` },
+    },
+  );
+  assert.equal(reply.status, 200);
+  assert.deepEqual(seen.jigglerPaths, ['/api/vm/mouse-jiggler', '/api/vm/mouse-jiggler/']);
+  assert.deepEqual(seen.jigglerBodies.at(-1), { enabled: false, mode: 'absolute' });
+});
+
+await check('media falls back to the legacy image routes and says when eject is unavailable', async () => {
+  const media = await client.media();
+  assert.deepEqual(media, { files: ['/data/test.iso'] });
+  assert.equal(client.legacyMedia, true);
+  seen.legacyMounts.length = 0;
+  await client.mount({ type: 'image', rel: '/data/test.iso', cdrom: true });
+  assert.deepEqual(seen.legacyMounts.at(-1), {
+    file: '/data/test.iso',
+    image: '/data/test.iso',
+    cdrom: true,
+    force: false,
+  });
+  await assert.rejects(client.mount({ type: 'partition', rel: '/data/test.iso' }), (error) => {
+    assert.ok(error instanceof NanoKvmError);
+    assert.equal(error.code, 'UNSUPPORTED');
+    assert.match(error.message, /cannot mount partitions/);
+    return true;
+  });
+  await assert.rejects(client.eject(), (error) => {
+    assert.ok(error instanceof NanoKvmError);
+    assert.equal(error.code, 'UNSUPPORTED');
+    assert.match(error.message, /cannot eject; mount another image to replace it/);
+    return true;
+  });
+  assert.equal(seen.legacyEjects, 1);
+});
+
+await check('2.5.0 password changes use the username shape and encrypt the new password', async () => {
+  applicationVersion = '2.5.0';
+  const legacyClient = new NanoKvmDevice({ device, timeoutMs: 5000 });
+  try {
+    await legacyClient.changePassword({ current: 'admin', next: 'newpass1' });
+  } finally {
+    legacyClient.close();
+  }
+  const body = seen.passwordBodies.at(-1);
+  assert.equal(body.username, 'admin');
+  assert.equal('currentPassword' in body, false);
+  assert.equal(decryptPassword(body.password), 'newpass1');
+});
+
+await check('2.6 password changes send both encrypted passwords and no username', async () => {
+  applicationVersion = '2.6.0';
+  const modernClient = new NanoKvmDevice({ device, timeoutMs: 5000 });
+  try {
+    await modernClient.changePassword({ current: 'admin', next: 'newpass1' });
+  } finally {
+    modernClient.close();
+  }
+  const body = seen.passwordBodies.at(-1);
+  assert.equal('username' in body, false);
+  assert.equal(decryptPassword(body.currentPassword), 'admin');
+  assert.equal(decryptPassword(body.password), 'newpass1');
+  applicationVersion = '2.5.0';
+});
+
+await check('the panel gate only blocks the four input actions', async () => {
+  const fake = {
+    power: async () => ({ before: false, after: true }),
+    setOled: async (sleep) => {
+      fake.oled = sleep;
+      return { sleep: sleep ? 1 : 0 };
+    },
+    mount: async (spec) => {
+      fake.mounted = spec;
+      return { ok: true };
+    },
+  };
+  const view = new PanelView({
+    pool: { target: () => ({ name: 'lab', client: fake }) },
+    settings: () => ({ injectInput: false, view: { autoOpen: true } }),
+    store: { summary: () => [] },
+  });
+  for (const action of ['paste', 'key', 'mouse', 'pointer']) {
+    await assert.rejects(view.act(action, {}), /input injection is disabled/);
+  }
+  const power = await view.act('power', { mode: 'press' });
+  assert.equal(power.power.after, true);
+  await view.act('oled', { sleep: true });
+  assert.equal(fake.oled, true);
+  await view.act('mount', { rel: '/data/test.iso' });
+  assert.equal(fake.mounted.rel, '/data/test.iso');
+
+  view.reveal('lab');
+  const signal = await view.state(undefined, { signal: true });
+  assert.equal(signal.reveal, 1);
+  assert.equal(signal.device, 'lab');
+  assert.deepEqual(signal.view, { autoOpen: true });
+});
+
+await check('resolution still falls back to a frame when input-resolution 404s', async () => {
+  const local = new NanoKvmDevice({ device, timeoutMs: 5000 });
+  try {
+    await local.login();
+    const resolution = await local.resolution();
+    assert.equal(resolution, null);
+    assert.equal(seen.inputResolution >= 1, true);
+    local.screenshot = async () => ({ jpeg: Buffer.alloc(0), width: 1024, height: 768 });
+    const size = await local.screenSize();
+    assert.deepEqual(size, { width: 1024, height: 768 });
+  } finally {
+    local.close();
+  }
 });
 
 client.close();

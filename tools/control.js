@@ -46,6 +46,7 @@ export function controlTools(deps) {
         if (!['on', 'off', 'press'].includes(mode)) throw new NanoKvmError(`unknown power mode "${mode}" — use on, off or press`);
         try {
           const result = await target.client.power(mode, { durationMs: Number(args.durationMs ?? 800) });
+          deps.reveal?.(target.name);
           return {
             device: target.name,
             mode,
@@ -69,6 +70,7 @@ export function controlTools(deps) {
         const target = deps.pool.target(args.device);
         try {
           const result = await target.client.reset();
+          deps.reveal?.(target.name);
           return { device: target.name, ok: true, ...result };
         } catch (error) {
           throw annotateDeviceError(error, target.name);

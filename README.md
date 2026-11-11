@@ -54,7 +54,7 @@ Settings ▸ Plugins ▸ NanoKVM. Each box is one complete card — address, log
 The first device is the default when a tool call omits `device`, unless another is marked default.
 
 Global settings stay global: request timeout, whether keyboard/mouse injection tools are allowed, whether the panel
-opens after an action, and the panel frame rate.
+opens after an action (a screenshot, power or reset), and the panel frame rate.
 
 ## Tools
 
@@ -87,8 +87,9 @@ power on/off/press, reset, Enter, an HDMI reset, and a text field that types int
 selector switches between them.
 
 The frame itself takes input: click, drag, right-click and wheel are absolute pointer reports mapped from the
-rendered picture back to the target's pixels. It is the same report `nanokvm_mouse` sends, and it obeys the same
-switch — with keyboard/mouse injection turned off, the panel refuses too instead of only the tools doing so.
+rendered picture back to the target's pixels. It is the same report `nanokvm_mouse` sends, and the panel's paste,
+key, mouse and pointer actions obey the injection switch. Power, reset, HDMI, OLED and media are device controls,
+not input injection, so they stay available when injection is turned off.
 
 ## How it talks to a box
 
@@ -101,15 +102,34 @@ switch — with keyboard/mouse injection turned off, the panel refuses too inste
   reports the power LED, which is what `power on/off` polls until it reaches the wanted state.
 - **Keyboard/mouse**: the `/api/ws` HID websocket, 8-byte boot reports (`[1, modifiers, 0, key1…key6]`) and 6-byte
   absolute mouse reports (`[2, buttons, x, y, wheel]`, x/y in 0–32767).
-- **Media**: `storage/media*` and `storage/image*`. `media/state` is missing on older firmware (404) and is treated as
-  "unknown" rather than an error.
+- **Media**: the client tries `storage/media*` first. Application 2.5.3+ serves it and still keeps the
+  pre-2.6 `storage/image*` endpoints as a compatibility layer; 2.5.0 serves only `storage/image*`. A 404/501 on the
+  modern family falls back to the legacy list/mount calls. `media/state` is missing there and is treated as
+  "unknown" rather than an error. 2.5.0 has no eject route at all.
 
 ## Requirements
 
 - Node 22+ (the plugin's own engines and the harness's).
-- A box reachable from the machine running DSH; firmware 1.4.x is enough for everything here except the
-  partition-level media view.
+- A box reachable from the machine running DSH. Baseline: application 2.5.0 and system image 1.4.2 or newer.
+  This release was exercised against application 2.5.0 on image 2026-06-10-1_4_3 (1.4.3).
 - Network access to the box's web port (80/443). No PVE, no SSH, no `ipmitool`.
+
+## Firmware compatibility
+
+The application version and the system image are separate: the image supplies the base system, the application is
+updated independently from it. The plugin reads the application version and adapts where the two APIs differ.
+
+| feature | application | system image |
+|---|---|---|
+| login, frame, power/reset, keyboard/mouse/paste, HDMI, OLED, status, HID | 2.5.0 (tested) | 1.4.2+ (tested 1.4.3) |
+| media list and whole-image mount | 2.5.0 via `storage/image*`; 2.5.3+ via `storage/media*` | 1.4.2+ |
+| partitions inside an image, media state, eject | 2.5.3+ | 1.4.2+ |
+| exact pointer resolution from `/api/vm/input-resolution` | 2.5.3+; 2.5.0 falls back to the frame size | 1.4.2+ |
+| password change verifies the current password | 2.6+; 2.5.x accepts username + new password only | 1.4.2+ |
+| mouse-jiggler read/write | 2.5.0+ | 1.4.2+ |
+
+On 2.5.0, eject has no route: mount the replacement image instead. The tool answers with that instruction rather
+than reporting a success that did not happen.
 
 ## Limitations
 
@@ -117,7 +137,8 @@ switch — with keyboard/mouse injection turned off, the panel refuses too inste
   is open in a browser — the next call reconnects.
 - `nanokvm_screenshot` needs an HDMI signal; there is no "capture a black screen" fallback.
 - The IPMI simulator inside the box is not managed here (it needs its own IPMI tooling and credentials).
-- Not verified: NanoKVM firmware older than 1.4.0 (the media and HID APIs changed), hardware without the OLED.
+- Not verified: applications older than 2.5.0 or system images older than 1.4.2 (the media and HID APIs changed),
+  hardware without the OLED.
 
 ## Development
 

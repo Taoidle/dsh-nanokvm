@@ -1154,6 +1154,41 @@ function build(require, module) {
             scoped.slots.register({ name: 'sidebar.right.pane.tab.title', key: TAB_ID, locale: LOCALE_NS }, PanelTitle),
           ),
         );
+
+        // `viewAutoOpen`: the host bumps a counter when a screenshot or a power
+        // action touches a box, and this watcher opens the tab when that counter
+        // moves. The signal endpoint answers from memory and never logs in, so a
+        // watcher that is left on costs no device traffic. The first sample only
+        // records the baseline; enabling the setting must not pop the tab open.
+        let lastReveal = null;
+        const autoOpenTimer = setInterval(async () => {
+          const form = ctx.configForms.get(NAMESPACE);
+          if (form?.getSnapshot?.()?.value?.viewAutoOpen !== true) {
+            lastReveal = null;
+            return;
+          }
+          try {
+            const response = await fetch(`${PANEL_BASE}/state?signal=1`, {
+              headers: { accept: 'application/json' },
+              cache: 'no-store',
+            });
+            if (!response.ok) return;
+            const body = await response.json();
+            const count = Number(body?.reveal ?? 0);
+            if (lastReveal === null) {
+              lastReveal = count;
+              return;
+            }
+            if (count > lastReveal) {
+              lastReveal = count;
+              scoped.sidebarRight.openTab(TAB_KIND);
+            }
+          } catch {
+            // The panel routes may not be mounted in a headless composition.
+          }
+        }, STATE_POLL_MS);
+        own(() => clearInterval(autoOpenTimer));
+
         return () => {
           for (const dispose of disposers.reverse()) dispose();
         };

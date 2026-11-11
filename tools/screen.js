@@ -63,6 +63,7 @@ export function screenTools(deps) {
         const target = deps.pool.target(args.device);
         try {
           const shot = await target.client.screenshot({ timeoutMs: Number(args.timeoutMs ?? 4000) });
+          deps.reveal?.(target.name);
           const attachment = await deps.attachments.saveImage({
             data: shot.jpeg,
             mediaType: 'image/jpeg',
@@ -84,9 +85,9 @@ export function screenTools(deps) {
     {
       name: 'nanokvm_resolution',
       description:
-        'Read the screen size used for pointer coordinates. Firmware 1.4.x has no input-resolution route, so this ' +
-        'falls back to a frame grabbed from the stream; pass the result to nanokvm_mouse when a click must land on ' +
-        'an exact pixel.',
+        'Read the screen size used for pointer coordinates. The application only serves `/api/vm/input-resolution` ' +
+        'from 2.5.3; on 2.5.0 and older this falls back to a frame grabbed from the stream, so it still works. ' +
+        'Pass the result to nanokvm_mouse when a click must land on an exact pixel.',
       parameters: { device: DEVICE_PARAM },
       output: PLAIN_OUTPUT,
       timeoutMs: 30000,

@@ -43,7 +43,11 @@ export function apply(ctx, config) {
   const pool = new DevicePool({ settings, log: ctx.logger });
   ctx.effect(() => () => pool.closeAll());
 
-  const deps = { pool, settings, attachments: ctx.attachments };
+  // The panel is built before the tools because the frame/power tools bump its
+  // reveal counter, which is what lets the tab auto-open through the existing
+  // `/state` route (no extra host route is needed).
+  const view = new PanelView({ pool, settings, store });
+  const deps = { pool, settings, attachments: ctx.attachments, reveal: (device) => view.reveal(device) };
   // `defineTool` compiles the author-facing parameter map into the object-rooted
   // JSON Schema the model API validates. Registering the raw options would send the
   // map itself as `parameters`, and a parameter named `type` then reads as the
@@ -64,6 +68,5 @@ export function apply(ctx, config) {
   // The panel reads its frames through HTTP routes on the same origin. A headless
   // composition has no web server: then the tools keep working and only the tab
   // has nothing to talk to, so the dependency is declared through ctx.inject.
-  const view = new PanelView({ pool, settings, store });
   ctx.inject(['webServer'], (scoped) => registerPanelRoutes(scoped.webServer, { view }));
 }

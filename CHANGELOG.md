@@ -1,5 +1,54 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- **`nanokvm_oled` sleep writes work again.** The box's `SetOledReq.Sleep` is a Go
+  `int`; the plugin sent a JSON boolean and every call answered `invalid arguments`.
+  Writes now send `1`/`0` through one `setOled` method used by both the tool and the
+  panel.
+- **The mouse-jiggler write is no longer a silent no-op.** The box registers
+  `POST /api/vm/mouse-jiggler/` with a trailing slash; posting to the slash-less path
+  got a 307 that the HTTP layer returned as if it were a success. The call now uses
+  the registered path, and `lib/http.js` follows same-origin 301/302/307/308
+  redirects (up to five), preserving method and body on 307/308.
+- **Password changes match the application's API and no longer send the new password
+  in clear.** Application 2.5.x takes `{username, password}` and does not verify the
+  current password; 2.6+ takes `{currentPassword, password}` and does. The values that
+  are sent are now AES-wrapped as the web UI does (2.5.x sends only the new one), and
+  the version is read once and cached.
+- **Media works on 2.5.0 as well as 2.5.3+.** The client tries `/api/storage/media*`
+  and falls back on 404/501 to the legacy `/api/storage/image*` list and mount calls.
+  Partition mounts are refused with an explanation, and on 2.5.0 — which has no eject
+  route — `nanokvm_eject` says "this firmware cannot eject; mount another image to
+  replace it" instead of reporting a false success. `nanokvm_media` reports whether it
+  answered through the legacy family.
+- **The panel's input gate now covers only input.** With `injectInput: false`, only
+  `paste`, `key`, `mouse` and `pointer` are refused; power, reset, HDMI, OLED, mount,
+  eject and media remain available. The previous gate blocked every panel action.
+- **`viewAutoOpen` now does something.** A screenshot, power or reset bumps a host
+  reveal counter exposed by the existing `/dsh-nanokvm/state?signal=1`; the sidebar
+  client opens the panel tab when the counter moves and the setting is on. The signal
+  answer does not log in to or touch the box.
+- **`nanokvm_resolution` still falls back to a frame** when
+  `/api/vm/input-resolution` is missing (2.5.0 and older); the 404 path is covered by
+  the mock tests.
+
+### Docs
+
+- README now states the application/system-image baseline explicitly and carries a
+  compatibility matrix: 2.5.0 core vs 2.5.3+ modern media/partitions/eject/input
+  resolution vs 2.6+ current-password verification, with system image 1.4.2+ as the
+  baseline (1.4.3 tested).
+
+### Tests
+
+- `tools/check-device.mjs` now pins the integer OLED body, the trailing-slash
+  jiggler request and 307 follow, both password request shapes with encrypted
+  values, the legacy media fallback and its clear eject error, the narrowed panel
+  gate, the reveal signal, and the resolution 404 fallback.
+
 ## [0.3.1] — 2026-11-11
 
 ### Fixed
