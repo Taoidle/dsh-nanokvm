@@ -23,8 +23,9 @@ jobs:
         with:
           node-version: 22
           registry-url: https://registry.npmjs.org
-      - run: npm install --no-audit --no-fund
-        continue-on-error: true # peer deps are provided by the harness, not by npm
+      # Only the schema library is needed to run the suite; the other imports
+      # are provided by the harness at runtime.
+      - run: npm install --no-save --no-audit --no-fund @deepseek-ai/schemastery@^3.18.4
       - run: npm run check && npm test
       - run: npm publish --provenance --access public
         env:

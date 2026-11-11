@@ -1,0 +1,21 @@
+# The test suite needs exactly one package from npm: the schema library.
+# Everything else the plugin imports is either Node itself or supplied by the
+# harness at runtime (and stubbed by the tests).
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-save --no-audit --no-fund @deepseek-ai/schemastery@^3.18.4
+      - run: npm run check
+      - run: npm test
