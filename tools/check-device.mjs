@@ -58,6 +58,7 @@ const seen = {
   legacyEjects: 0,
 };
 let applicationVersion = '2.5.0';
+let cookieOnlyLogin = false;
 
 /** Read and parse one JSON request body. */
 function readJson(req, done) {
@@ -90,6 +91,10 @@ const server = http.createServer((req, res) => {
       if (expireAfterLogin) {
         validToken = `stale-${loginCount}`;
         expireAfterLogin = false;
+      }
+      if (cookieOnlyLogin) {
+        reply(200, { code: 0, msg: 'success', data: null }, { 'set-cookie': [`nano-kvm-token=${validToken}; Path=/; HttpOnly; SameSite=Strict`] });
+        return;
       }
       reply(200, { code: 0, data: { token: validToken } });
     });
@@ -226,6 +231,18 @@ await check('login stores the cookie and info answers', async () => {
   const info = await client.info();
   assert.equal(info.application, '2.5.0');
   assert.equal(seen.failedAuth, 0);
+});
+await check('a login that only sets the cookie still yields a session', async () => {
+  cookieOnlyLogin = true;
+  const before = seen.logins;
+  const cookieClient = new NanoKvmDevice({ device, timeoutMs: 5000 });
+  await cookieClient.login();
+  assert.equal(seen.logins, before + 1);
+  assert.equal(cookieClient.token, validToken);
+  assert.equal(cookieClient.cookie, `nano-kvm-token=${validToken}`);
+  const info = await cookieClient.info();
+  assert.equal(info.application, '2.5.0');
+  cookieOnlyLogin = false;
 });
 await check('a 401 forces exactly one re-login and then succeeds', async () => {
   validToken = 'revoked-by-the-box';

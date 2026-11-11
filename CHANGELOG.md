@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.3.3] — 2026-11-12
+
+### Fixed
+
+- Login no longer insists on `data.token`: some firmware (seen on app 2.5.2) answers
+  `{"code":0,"data":null}` and only hands the session JWT back as a `Set-Cookie` header, so those
+  boxes reported "login returned no token" in the plugin while the web UI worked. The token is now
+  read from the cookie header when the body does not carry one, and a regression test covers the
+  cookie-only reply.
+
 ## [0.3.2] — 2026-11-12
 
 ### Fixed

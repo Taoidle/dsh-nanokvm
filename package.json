@@ -1,6 +1,6 @@
 {
   "name": "dsh-nanokvm",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "NanoKVM control for DeepSeek Harness: see the target screen, press power, type and click, mount virtual media, and manage several NanoKVM devices from one right-side panel.",
   "type": "module",
   "license": "MIT",
